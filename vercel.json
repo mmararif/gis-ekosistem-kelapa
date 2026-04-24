@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/geoserver/:match*",
-      "destination": "https://bondless-phrasing-wispy.ngrok-free.dev/geoserver/:match*"
+      "destination": "https://bookstore-fonts-ward-cubic.trycloudflare.com/geoserver/:match*"
     }, {
       "source": "/(.*)",
       "destination": "/"
