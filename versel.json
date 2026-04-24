@@ -3,6 +3,9 @@
     {
       "source": "/geoserver/:match*",
       "destination": "https://bondless-phrasing-wispy.ngrok-free.dev/geoserver/:match*"
+    }, {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
