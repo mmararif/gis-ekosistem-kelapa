@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { MapContainer, TileLayer, WMSTileLayer } from "react-leaflet";
+import { MapContainer, TileLayer, WMSTileLayer, ZoomControl } from "react-leaflet";
 import 'leaflet/dist/leaflet.css';
 import Navbar from "../components/Navbar";
 import LayerPanel from "../components/LayerPanel";
@@ -15,6 +15,7 @@ export const LAYER_CONFIG = [
     { id: 'layerDem', name: 'Demnas', wsName: 'risetids:Demnas_Clip-2' },
     { id: 'layerLahan', name: 'Tutupan Lahan', wsName: 'risetids:Tutupan_Lahan' },
     { id: 'layerParit', name: 'Parit dan Tanggul', wsName: 'risetids:Parit_Tanggul' },
+    { id: 'layerPolaRuang', name: 'Rencana Pola Ruang', wsName: 'risetids:Rencana Pola Ruang' }
 ];
 
 // export const GEOSERVER_URL = "http://localhost:8080/geoserver/risetids/wms";
@@ -32,7 +33,8 @@ const MapPage = () => {
         layerKelapa: false,
         layerDem: false,
         layerLahan: false,
-        layerParit: false
+        layerParit: false,
+        layerPolaRuang: false
     });
 
     const handleToggleLayer = (layerId) => {
@@ -86,6 +88,8 @@ const MapPage = () => {
                             />
                         )
                     ))};
+
+                    <ZoomControl position="bottomleft"/>
                 </MapContainer>
 
             </div>

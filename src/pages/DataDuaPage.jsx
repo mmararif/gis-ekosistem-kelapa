@@ -7,6 +7,7 @@ import {
   getSortedRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
+  RowExpanding,
 } from '@tanstack/react-table';
 
 const DataDuaPage = () => {
@@ -16,6 +17,180 @@ const DataDuaPage = () => {
 
   const [sorting, setSorting] = useState([]);
   const [globalFilter, setGlobalFilter] = useState('');
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // Untuk menangkap huruf yang diketik dan memasukkannya ke tabel(sementara)
+  const handleInputChange = (fid, columnId, value) => {
+    setData(oldData => 
+      oldData.map(row => {
+        if (row.fid === fid) {
+          return { ...row, [columnId]: value};
+        }
+        return row;
+      })
+    );
+  };
+
+  const handleSimpanMassal = async () => {
+    const currentRows = table.getRowModel().rows.map(row => row.original);
+
+    if (currentRows.length === 0) return;
+
+    try {
+
+      const createPropertyXML = (name, value) => {
+
+        if (value === '' || value === null || value === undefined) return '';
+
+        const safeValue = String(value).replace(',', '.');
+        
+        return `
+          <wfs:Property>
+            <wfs:Name>${name}</wfs:Name>
+            <wfs:Value>${safeValue}</wfs:Value>
+          </wfs:Property>
+        `;
+      };
+
+      const updatesXML = currentRows.map(rowData => {
+        const propPanjang = createPropertyXML('panjang', rowData['panjang']);
+        const propLebar = createPropertyXML('lebar', rowData['lebar']);
+        const propMasalah = createPropertyXML('permasalahan', rowData['permasalahan']);
+
+        if (!propPanjang && !propLebar && !propMasalah) return '';
+
+        return `
+          <wfs:Update typeName="risetids:Parit_Tanggul" xmlns:ogc="http://www.opengis.net/ogc">
+            ${propPanjang}
+            ${propLebar}
+            ${propMasalah}
+            <ogc:Filter>
+              <ogc:FeatureId fid="${rowData.fid}"/>
+            </ogc:Filter>
+          </wfs:Update>
+        `;
+      }).join('');
+
+      if (!updatesXML.trim()) {
+        setIsEditMode(false);
+        return;
+      }
+    
+      // const updatesXML = currentRows.map(rowData => `
+      //   <wfs:Update typeName="risetids:Parit_Tanggul">
+      //     <wfs:Property>
+      //       <wfs:Name>panjang</wfs:Name>
+      //       <wfs:Value>$rowData['panjang'] || ''</wfs:Value>
+      //     </wfs:Property>
+      //     <wfs:Property>
+      //       <wfs:Name>lebar</wfs:Name>
+      //       <wfs:Value>$rowData['lebar'] || ''</wfs:Value>
+      //     </wfs:Property>
+      //     <wfs:Property>
+      //       <wfs:Name>permasalahan</wfs:Name>
+      //       <wfs:Value>$rowData['permasalahan'] || ''</wfs:Value>
+      //     </wfs:Property>
+      //     <ogc:Filter>
+      //       <ogc:FeatureId fid="${rowData.fid}"/>
+      //     </ogc:Filter>
+      //   </wfs:Update>
+      //   `).join('');
+
+        const xmlBody = `
+          <wfs:Transaction service="WFS" version="1.0.0" 
+            xmlns:wfs="http://www.opengis.net/wfs"
+            xmlns:ogc="http://www.opengis.net/ogc"
+            xmlns:gml="http://www.opengis.net/gml"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            ${updatesXML}
+          </wfs:Transaction>
+        `;
+
+        const response = await fetch('/geoserver/risetids/ows', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/xml'},
+          body: xmlBody
+        });
+
+        const textResponse = await response.text();
+
+        if (textResponse.includes('WFS_TransactionResponse') && textResponse.includes('SUCCESS')) {
+          alert('Berhasil! Seluruh data di halaman ini telah tersimpan!');
+          setIsEditMode(false);
+        } else {
+          alert('Gagal menyimpan data');
+          console.log("Error dari Geoserver:", textResponse);
+        }
+
+    } catch (error) {
+      console.error("Gagal melakukan transaksi WFS:", error);
+    }
+  }
+
+  // saat tombol "simpan" ditekan
+  // const handleSimpanBaris = async (rowData) => {
+  //   // console.log("Data yang akan di-update:", rowData);
+  //   // alert(`Berhasil mengunci data ${rowData.Nama}. (Koneksi ke Geoserver menyusul!)`);
+
+  //   try {
+  //     const xmlBody = `
+  //       <wfs:Transaction service="WFS" version="1.0.0"
+  //         xmlns:wfs="http://www.opengis.net/wfs"
+  //         xmlns:ogc="http://www.opengis.net/ogc"
+  //         xmlns:risetids="risetids">
+  //         <wfs:Update typeName="risetids:Parit_Tanggul">
+
+  //           <wfs:Property>
+  //             <wfs:Name>panjang</wfs:Name>
+  //             <wfs:Value>${rowData['panjang'] || ''}</wfs:Value>
+  //           </wfs:Property>
+
+  //           <wfs:Property>
+  //             <wfs:Name>lebar</wfs:Name>
+  //             <wfs:Value>${rowData['lebar'] || ''}</wfs:Value>
+  //           </wfs:Property>
+
+  //           <wfs:Property>
+  //             <wfs:Name>permasalahan</wfs:Name>
+  //             <wfs:Value>${rowData['permasalahan'] || ''}</wfs:Value>
+  //           </wfs:Property>
+
+  //           <ogc:Filter>
+  //             <ogc:FeatureId fid="${rowData.fid}"/>
+  //           </ogc:Filter>
+
+  //         </wfs:Update>
+  //       </wfs:Transaction>
+  //     `;
+
+  //     const response = await fetch('/geoserver/risetids/ows', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type' : 'text/xml',
+  //       }, 
+  //       body: xmlBody
+  //     });
+
+  //     const textResponse = await response.text();
+  //     console.log("Respon dari Geoserver:", textResponse);
+
+  //     if (textResponse.includes('WFS_TransactionResponse') && textResponse.includes('SUCCES')) {
+  //       alert(`Berhasil! Data ${rowData.Nama} sudah masuk Database!`);
+  //     } else {
+  //       alert('Geoserver menolak transaksi!');
+  //     }
+
+  //     // if (response.ok) {
+  //     //   alert(`Mantap Data ${rowData.Nama} berhasil diupdate ke PostgreSQL!`);
+  //     // } else {
+  //     //   alert('Waduh, gagal menyimpan data');
+  //     // }
+
+  //   } catch (error) {
+  //     console.error("Gagal melakukan transaksi WFS-T:", error);
+  //   }
+  // };
+
 
   // 1. DAFTAR KOLOM UNTUK TAB KEBUN
   // accessorKey diambil LANGSUNG dari kodingan p["..."] temanmu!
@@ -30,15 +205,70 @@ const DataDuaPage = () => {
   ], []);
 
   // 2. DAFTAR KOLOM UNTUK TAB PARIT
-  const columnsParit = useMemo(() => [
-    { header: 'No', id: 'index', cell: (info) => info.row.index + 1 },
-    { header: 'Nama Parit/Tanggul', accessorKey: 'Nama' },
-    { header: 'Desa', accessorKey: 'Desa' },
-    { header: 'Kecamatan', accessorKey: 'Kecamatan' },
-    { header: 'Panjang (km)', accessorKey: 'Panjang Parit/Tanggul (km)' },
-    { header: 'Lebar (m)', accessorKey: 'Lebar Parit/Tanggul (m)' },
-    { header: 'Permasalahan', accessorKey: 'Permasalahan' },
-  ], []);
+  const columnsParit = useMemo(() => {
+    const cols = [
+      { header: 'No', id: 'index', cell: (info) => info.row.index + 1 },
+      { header: 'Nama Parit/Tanggul', accessorKey: 'Nama' },
+      { header: 'Desa', accessorKey: 'Desa' },
+      { header: 'Kecamatan', accessorKey: 'Kecamatan' },
+      { header: 'Panjang (km)', 
+        accessorKey: 'panjang',
+        cell: ({ row, column }) => {
+          return isEditMode ? (
+            <input 
+              type="text"
+              value={row.original[column.id] || ''}
+              onChange={(e) => handleInputChange(row.original.fid, column.id, e.target.value)}
+              className='w-24 border border-[#1268A8] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#1268A8]'
+            />
+          ) : row.original[column.id];
+        }
+      },
+      { header: 'Lebar (m)', 
+        accessorKey: 'lebar',
+        cell: ({ row, column }) => {
+          return isEditMode ? (
+            <input 
+              type="text"
+              value={row.original[column.id] || ''}
+              onChange={(e) => handleInputChange(row.original.fid, column.id, e.target.value)}
+              className='w-24 border border-[#1268A8] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#1268A8]'
+            />
+          ) : row.original[column.id];
+        }
+      },
+      { header: 'Permasalahan', 
+        accessorKey: 'permasalahan',
+        cell: ({ row, column }) => {
+          return isEditMode ? (
+            <input 
+              type="text"
+              value={row.original[column.id] || ''}
+              onChange={(e) => handleInputChange(row.original.fid, column.id, e.target.value)}
+              className='w-24 border border-[#1268A8] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#1268A8]'
+            />
+          ) : row.original[column.id];
+        }
+      },
+    ];
+
+    // if (isEditMode) {
+    //   cols.push({
+    //     header: 'Aksi',
+    //     id: 'aksi',
+    //     cell: ({ row }) => (
+    //       <button 
+    //         onClick={() => handleSimpanBaris(row.original)}
+    //         className='bg-[#1268A8] hover:bg-blue-700 text-white px-4 py-1.5 rounded text-xs font-bold transition-colos'
+    //       >
+    //         Simpan
+    //       </button>
+    //     )
+    //   });
+    // }
+    return cols;
+  }, [isEditMode]);
+    
 
   // 3. LOGIKA MEMILIH KOLOM (Berdasarkan Tab Aktif)
   // Inilah keajaiban React! Kita cukup mem-passing variabel ini ke TanStack
@@ -72,7 +302,19 @@ const DataDuaPage = () => {
         const result = await response.json();
 
         // Ekstrak data properties-nya saja
-        const formattedData = result.features.map(feature => feature.properties);
+        // const formattedData = result.features.map(feature => feature.properties);
+        // setData(formattedData);
+
+        const formattedData = result.features.map(feature => ({
+          ...feature.properties,
+          fid: feature.id 
+        }));
+        formattedData.sort((a, b) => {
+          const idA = parseInt(a.fid.split('.')[1]) || 0;
+          const idB = parseInt(b.fid.split('.')[1]) || 0;
+          
+          return idA - idB;
+        });
         setData(formattedData);
 
         setGlobalFilter('');
@@ -96,6 +338,7 @@ const DataDuaPage = () => {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    autoResetPageIndex: false,
     state: {
       sorting,
       globalFilter,
@@ -134,17 +377,45 @@ const DataDuaPage = () => {
             </button>
           </div>
 
-          <div className='relative mb-2'>
-            <input type="text" 
-              value={globalFilter ?? ''}
-              onChange={e => setGlobalFilter(e.target.value)}
-              placeholder='Cari data...'
-              className='pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1268a8]/50 transition-all w-64'
-            />
-            <svg className="w-4 h-4 text-gray-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+          <div className='flex items-center gap-4 mb-2'>
+            {activeTab === 'parit' && (
+              <>
+                <button
+                  onClick={() => setIsEditMode(!isEditMode)}
+                  className={`px-4 py-2 text-sm font-bold rounded-lg transition-all border ${
+                    isEditMode
+                      ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+                      : 'bg-[#1268A8]/10 text-[#1268A8] border-[#1268A8]/20 hover:bg-[#1268A8]/20'
+                  }`}
+                >
+                  {isEditMode ? 'Batal Edit' : 'Mode Edit'}
+                </button>
+
+                {isEditMode && (
+                  <button
+                    onClick={handleSimpanMassal}
+                    className='bg-green-600 hover:bg-green-700 text-white px-4 py-2 text-sm font-bold rounded-lg shadow-sm transition-all'
+                  >
+                    Simpan
+                  </button>
+                )}
+              </>
+            )}
+
+            <div className='relative '>
+              <input type="text" 
+                value={globalFilter ?? ''}
+                onChange={e => setGlobalFilter(e.target.value)}
+                placeholder='Cari data...'
+                className='pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1268a8]/50 transition-all w-64'
+              />
+              <svg className="w-4 h-4 text-gray-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
           </div>
+
+          
         </div>
 
         {/* BAGIAN TABEL KAPSUL */}

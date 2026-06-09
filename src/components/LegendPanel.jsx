@@ -33,17 +33,20 @@ const LegendPanel = ({ activeLayers }) => {
                 <div className="flex flex-col gap-3 px-6 pb-6 flex-1 overflow-y-auto">
                     {activeLayerConfigs.map(layer => {
                         const legendUrl = `${GEOSERVER_URL}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&WIDTH=20&HEIGHT=20&LEGEND_OPTIONS=forceLabels:on;fontSize:12&LAYER=${layer.wsName}`;
+                        // const legendUrl = `${GEOSERVER_URL}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&WIDTH=20&HEIGHT=20&LEGEND_OPTIONS=forceLabels:on;fontSize:16;dpi:180;fontAntiAliasing:true&LAYER=${layer.wsName}`;
 
                         return (
                             <div key={layer.id} >
                                 <h4 className="text-sm font-semibold text-[#1268A8]">{layer.name}</h4>
-                                <img 
-                                    src={legendUrl} 
-                                    alt={`Legenda ${layer.name}`} 
-                                    className="max-w-full object-contain"
-                                    // Antisipasi jika GeoServer gagal mengirim gambar
-                                    onError={(e) => e.target.style.display = 'none'}
-                                />
+                                <div className="overflow-x-auto w-full pb-2">
+                                    <img 
+                                        src={legendUrl} 
+                                        alt={`Legenda ${layer.name}`} 
+                                        className="max-w-none object-contain"
+                                        // Antisipasi jika GeoServer gagal mengirim gambar
+                                        onError={(e) => e.target.style.display = 'none'}
+                                    />
+                                </div>
                             </div>
                         )
                     })}
